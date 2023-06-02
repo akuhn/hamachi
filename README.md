@@ -1,74 +1,77 @@
 # Hamachi
 
-The Hamachi gem provides a flexible and type-safe representation of JSON data in Ruby. It allows you to define and validate data models with type-checked fields, making it easier to build complex applications.
+Hamachi is a Ruby library designed to simplify the creation and manipulation of domain-specific data models, supporting type checking, data validation, and JSON deserialization. This library takes advantage of Ruby's dynamic nature, providing a fluent and intuitive interface to define domain models.
+
+## Features
+
+- Dynamic model creation with a flexible field declaration syntax.
+- Type checking and enforcement to ensure model validity.
+- Simple JSON to Model deserialization.
+- Easy access to model data using accessor methods.
+- Nullability, enumerations, lists, and other constraints.
+- Custom model matching classes for extending the library's capabilities.
 
 ## Installation
 
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'model'
+gem 'hamachi'
 ```
 
 And then execute:
 
-```shell
-$ bundle install
-```
+    $ bundle install
 
 Or install it yourself as:
 
-```shell
-$ gem install model
-```
+    $ gem install hamachi
 
 ## Usage
 
-To use the Hamachi gem, you can define your own models by subclassing the `Model` class. Here's an example:
+Here is a basic usage example:
 
 ```ruby
 require 'hamachi'
 
-class Person < Hamachi::Model
+class User < Hamachi::Model
   field :name, type: String
-  field :gender, type: (enum :male, :female)
   field :age, type: 1..100
-
-  def greeting
-    "Hello, my name is #{name}!"
-  end
 end
 
-person = Person.new(
-  name: 'Anna',
-  gender: :female,
-  age: 29
-)
+user = User.from_json('{"name": "Alice", "age": 30}')
+user = User.new(name: "Alice", age: 30)
 
-person.name # => "Anna"
-person.gender # => :female
-person.age # => 29
-person.age = 200 # => raises RuntimeError: expected age to be 1..100, got 200
-
-snapshot = person.to_json
-anna = Person.from_snapshot(snapshot)
+user.name = 'Bob'
+user.age = 120 # => raises RuntimeError: expected age to be 1..100, got 120
 ```
 
-In this example, we define a `Person` model with three fields: `name`, `gender`, and `age`. Each field has a specified type. You can create instances of the `Person` model by passing the field values as a hash to the `Person.new` method. The values are type-checked against the specified types.
+You can define the following types of fields:
 
-You can also serialize and deserialize model instances to and from JSON using the `to_json` and `from_snapshot` methods.
+- Basic types (e.g. `String`, `Integer`, `Float`, `Symbol`, `Boolean`)
+- Enumerations (e.g. `enum(:admin, :user, :guest)`)
+- Lists of certain type (e.g. `list(String)`, `list(User)`)
+- Nullable fields (e.g. `nullable(String)`, `nullable(User)`)
+- Positive value fields (e.g. `positive(Integer)`, `positive(Float)`)
+- Regular expressions (e.g. `/\A\d\d\d\d-\d\d-\d\d\z/` for matching dates)
+- Ranges (e.g. `1..100` for matching integers between 1 and 100)
 
-## Type Checking
+More complex nested models can be created:
 
-The Hamachi gem performs type checking based on the specified types of the fields. It uses the `===` operator and custom matchers to validate the values. If a value doesn't match the specified type, an error is raised.
+```ruby
+class Post < Hamachi::Model
+  field :title, type: String
+  field :content, type: String
+  field :created_at, type: Timestamp
+  field :tags, type: list(String)
+end
 
-The gem provides several built-in matchers for common types, such as enums, lists, and nullable types. You can also create custom matchers by subclassing the `Matcher` class.
-
-## Customization
-
-You can customize the behavior of the Hamachi gem by overriding methods or subclassing the `Matcher` class. This allows you to enforce domain-specific rules, validate complex data structures, or control the serialization process.
-
-The gem provides extension points for defining custom matchers, such as `enum`, `list`, `nullable`, `model`, `positive`, and `positive_or_zero`. These matchers can be used to define more specific types or constraints for your fields.
+class User < Hamachi::Model
+  field :name, type: String
+  field :friends, type: list(User)
+  field :posts, type: list(Post)
+end
+```
 
 ## Contributing
 
