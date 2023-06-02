@@ -75,7 +75,7 @@ end
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at [link to GitHub repo](https://github.com/yourusername/your-repo).  This project encourages collaboration and appreciates contributions. Feel free to contribute to the project by reporting bugs or submitting pull requests.
+Bug reports and pull requests are welcome on GitHub at [link to GitHub repo](https://github.com/akuhn/hamachi).  This project encourages collaboration and appreciates contributions. Feel free to contribute to the project by reporting bugs or submitting pull requests.
 
 ## License
 
