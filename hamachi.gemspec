@@ -23,6 +23,8 @@ Gem::Specification.new do |spec|
     README.md
     lib/hamachi.rb
     lib/hamachi/model.rb
+    lib/hamachi/ext.rb
+    lib/hamachi/enumerable_ext.rb
     lib/hamachi/version.rb
   }
 
