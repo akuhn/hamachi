@@ -1,5 +1,7 @@
-require 'json'
 require 'hamachi/matcher'
+require 'hamachi/version'
+
+require 'json'
 
 
 module Hamachi
@@ -48,7 +50,7 @@ module Hamachi
     end
 
     def self.register_matcher(name, matcher_class)
-      singleton_class.define_method name do |arg, *args|
+      singleton_class.send(:define_method, name) do |arg, *args|
         matcher_class.new(arg, *args)
       end
     end

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Enable rbenv shell integration
+eval "$(rbenv init -)"
+
+for version in $(rbenv versions --bare); do
+  rbenv shell $version
+  printf -- '-%.0s' {1..72}; echo
+  echo "Using $(ruby --version)"
+  rspec --format progress
+done
+
+rbenv shell system

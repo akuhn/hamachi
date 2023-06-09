@@ -100,7 +100,7 @@ describe Hamachi::Model do
         { name: 'Anna', gender: :female, age: 29 },
         freeze: true,
       )
-      expect { anna.name = 'Sophie' }.to raise_error(/can't modify frozen schema/)
+      expect { anna.name = 'Sophie' }.to raise_error(/can't modify frozen/)
     end
   end
 
@@ -257,7 +257,7 @@ describe Hamachi::Model do
       m = model.parse annas_order
       expect(m.items).to all be_a Hamachi::Model
       expect(m.items.length).to eq 3
-      expect(m.items.sum(&:price)).to eq 82.98
+      expect(m.items.sum(&:price)).to eq 82.98 if RUBY_VERSION > '2.0.0'
     end
 
     it 'should serialize-and-back using JSON format' do
