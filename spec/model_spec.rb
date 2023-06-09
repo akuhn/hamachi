@@ -68,18 +68,18 @@ describe Hamachi::Model do
 
     it 'creates model instance from JSON snapshot' do
       json = '{"name":"Anna","gender":"female","age":29}'
-      expect(model.from_json json).to eq anna
+      expect(model.parse json).to eq anna
     end
 
     it 'raises error when JSON snapshot was parsed without symbolize_names=true' do
       json = '{"name":"Anna","gender":"female","age":29}'
       snapshot = JSON.parse json # defaults to { symbolize_names: false } option
-      expect { model.from_snapshot snapshot }.to raise_error(/expected names to be symbols/)
+      expect { model.from_snapshot snapshot }.to raise_error 'expected name to be String, got nil'
     end
 
     it 'raises error when JSON snapshot includes invalid field' do
       json = '{"name":"Anna","gender":"female","age":9000}'
-      expect { model.from_json json }.to raise_error(/expected age to be .../)
+      expect { model.parse json }.to raise_error(/expected age to be .../)
     end
 
     it 'should allow undeclared fields by default' do
@@ -90,7 +90,7 @@ describe Hamachi::Model do
     it 'should not allow undeclared fields when the option is disabled' do
       anna = model.new(
         { name: 'Anna', gender: :female, age: 29, hobby: 'painting' },
-        ignore_undeclared_fields: true,
+        include_unknown_fields: false,
       )
       expect(anna[:hobby]).to be_nil
     end
@@ -107,7 +107,7 @@ describe Hamachi::Model do
   describe 'when field is a list' do
 
     let(:model) {
-      Hamachi::Model.define do
+      Hamachi::Model.schema do
         field %{sequence}, type: (list Integer)
       end
     }
@@ -131,7 +131,7 @@ describe Hamachi::Model do
 
     it 'should raise error when empty list is passed to non-empty field' do
       expect {
-        model = Hamachi::Model.define { field %{sequence}, type: (list Integer), empty: false }
+        model = Hamachi::Model.schema { field %{sequence}, type: (list Integer), empty: false }
         model.new({sequence: []})
       }.to raise_error(/expected .* to be .* empty: false/)
     end
@@ -140,7 +140,7 @@ describe Hamachi::Model do
   describe 'with custom type matcher' do
 
     let(:matcher) {
-      Class.new Hamachi::Model::Matcher do
+      Class.new Hamachi::Matcher do
         def ===(value)
           @type === value && value.odd?
         end
@@ -157,7 +157,7 @@ describe Hamachi::Model do
 
     let(:model) {
       odd_number = matcher.new(Numeric)
-      Hamachi::Model.define { field %{num}, type: odd_number }
+      Hamachi::Model.schema { field %{num}, type: odd_number }
     }
 
     it 'should use default value when field missing upon initialize' do
@@ -166,7 +166,7 @@ describe Hamachi::Model do
     end
 
     it 'should use default value when field missing from snapshot' do
-      m = model.from_json '{}'
+      m = model.parse '{}'
       expect(m.num).to eq 1
     end
 
@@ -177,9 +177,9 @@ describe Hamachi::Model do
     end
 
     it 'should check type upon reading from snapshot' do
-      m = model.from_json '{"num":23}'
+      m = model.parse '{"num":23}'
       expect(m.num).to eq 23
-      expect { model.from_json '{"num":42}' }.to raise_error(/expected .* odd number/)
+      expect { model.parse '{"num":42}' }.to raise_error(/expected .* odd number/)
     end
 
     it 'should check type upon setting attribute' do
@@ -199,12 +199,12 @@ describe Hamachi::Model do
     end
 
     it 'fails when reading nil value from snapshot' do
-      expect { model.from_json '{"num":null}' }.to raise_error(/expected .* odd number/)
+      expect { model.parse '{"num":null}' }.to raise_error(/expected .* odd number/)
     end
 
     it 'supports nested matchers' do
       odd_number = matcher.new(Numeric)
-      model = Hamachi::Model.define { field %{seq}, type: (list odd_number) }
+      model = Hamachi::Model.schema { field %{seq}, type: (list odd_number) }
       expect { model.new(seq: [3,5,7]) }.to_not raise_error
       expect { model.new(seq: [1,2,3]) }.to raise_error(/expected .* list\(odd number\)/)
     end
@@ -213,13 +213,13 @@ describe Hamachi::Model do
   describe 'when fields are models (complex data structure)' do
 
     let(:model) {
-      Hamachi::Model.define do
+      Hamachi::Model.schema do
         field %{name}, type: String
-        field %{address}, type: (model {
+        field %{address}, type: (schema {
           field %{street}, type: String
           field %{city}, type: String
         })
-        field %{items}, type: (list model {
+        field %{items}, type: (list schema {
           field %{name}, type: String
           field %{price}, type: Float
         })
@@ -242,28 +242,28 @@ describe Hamachi::Model do
     }
 
     it 'should read valid instance from snapshot' do
-      m = model.from_json annas_order
+      m = model.parse annas_order
       expect { model.new m }.to_not raise_error
     end
 
     it 'should read has-one model field from snapshot' do
-      m = model.from_json annas_order
+      m = model.parse annas_order
       expect(m.address).to be_a Hamachi::Model
       expect(m.address.street).to eq '834 Oak Street'
       expect(m.address.city).to eq 'Roseville'
     end
 
     it 'should read has-many model field from snapshot' do
-      m = model.from_json annas_order
+      m = model.parse annas_order
       expect(m.items).to all be_a Hamachi::Model
       expect(m.items.length).to eq 3
       expect(m.items.sum(&:price)).to eq 82.98
     end
 
     it 'should serialize-and-back using JSON format' do
-      m = model.from_json annas_order
+      m = model.parse annas_order
       json = (JSON.dump m)
-      expect(model.from_json json).to eq m
+      expect(model.parse json).to eq m
     end
 
     it 'anonymous model prints human-readable representation' do

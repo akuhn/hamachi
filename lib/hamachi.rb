@@ -1,4 +1,5 @@
 require 'json'
+require 'hamachi/matcher'
 
 # A model has type-checked fields.
 #
@@ -61,62 +62,15 @@ require 'json'
 module Hamachi
   class Model < Hash
 
-    NULL = Object.new
-
-    def initialize(snapshot, options = {})
-      update(snapshot) unless options.fetch(:ignore_undeclared_fields, false)
-
-      self.class.fields.each do |name, field|
-        value = snapshot.fetch(name, field.default_value)
-        self[name] = field.from_snapshot(value, options)
-      end
-
-      check_types if options.fetch(:check_types, true)
-      freeze if options.fetch(:freeze, false)
-    end
-
-    def self.from_snapshot(snapshot, options = {})
-      return snapshot unless Hash === snapshot
-      unless snapshot.keys.all? { |name| Symbol === name }
-        raise "expected names to be symbols, got other"
-      end
-      self.new snapshot, options
-    end
-
-    def self.from_json(str)
-      snapshot = JSON.parse str, symbolize_names: true
-      self.from_snapshot(snapshot, {})
-    end
-
-    def check_types
-      self.class.fields.each do |name, field|
-        if not field === self[name]
-          raise "expected #{name} to be #{field}, got #{self[name].inspect}"
-        end
-      end
-    end
-
-    def prune_default_values
-      self.class.fields.each do |name, field|
-        case value = self[name]
-        when field.default_value
-          self.delete(name)
-        when Model
-          value.prune_default_values
-        when Array
-          value.each { |each| each.prune_default_values if Model === each }
-        end
-      end
-
-      return self
-    end
+    # ------- declaration ----------------------------------------------
 
     def self.fields
       @fields ||= {}
     end
 
     def self.field(name, options)
-      raise "expected #{name} to be undefined, got method" if method_defined?(name.to_sym)
+      raise ArgumentError, "method #{name} already defined" if method_defined?(name)
+      raise ArgumentError, "method #{name}= already defined" if method_defined?("#{name}=")
 
       field = options.fetch(:type)
       field = Matcher.new(field) unless Matcher === field
@@ -138,148 +92,92 @@ module Hamachi
           self[:#{name}] = value
         end
       }
-    end
 
-    def self.define(&block) # for anonymous inline models
-      Class.new Hamachi::Model, &block
+      return self
     end
 
     def self.to_s
       name ? name : "model(#{fields.map { |name, field| "#{name}:#{field}"}.join(',')})"
     end
 
-
-    # --- Helper methods for type declarations ------------------
-
-    def self.enum(*symbols)
-      EnumMatcher.new(symbols)
+    def self.schema(&block) # for anonymous inline models
+      Class.new Hamachi::Model, &block
     end
 
-    def self.list(type)
-      ListMatcher.new(type)
+    def self.register_matcher(name, matcher_class)
+      singleton_class.define_method name do |arg, *args|
+        matcher_class.new(arg, *args)
+      end
     end
 
-    def self.nullable(type)
-      NullableMatcher.new(type)
-    end
+    register_matcher :list, ListMatcher
+    register_matcher :nullable, NullableMatcher
+    register_matcher :enum, EnumMatcher
 
-    def self.model(&block)
-      Hamachi::Model.define(&block)
-    end
-
-    def self.positive(type)
-      PositiveMatcher.new(type)
-    end
-
-    def self.positive_or_zero(type)
-      PositiveOrZeroMatcher.new(type)
-    end
+    Boolean = enum(true, false)
 
 
-    # --- Matcher classes ---------------------------------------
+    # ------- initialization -------------------------------------------
 
-    class Matcher
-      def initialize(type)
-        @type = type
+    def initialize(snapshot, options = {})
+      update(snapshot) if options.fetch(:include_unknown_fields, true)
+
+      self.class.fields.each do |name, field|
+        value = snapshot.fetch(name, field.default_value)
+        self[name] = field.from_snapshot(value, options)
       end
 
-      def initialize_options(options)
-      end
+      check_types if options.fetch(:check_types, true)
+      freeze if options.fetch(:freeze, false)
+    end
 
-      def ===(value)
-        @type === value
-      end
+    def self.from_snapshot(snapshot, options = {})
+      return snapshot unless Hash === snapshot
+      self.new snapshot, options
+    end
 
-      def default_value
-        nil
+    def self.parse(string, options = {})
+      snapshot = JSON.parse(string, symbolize_names: true)
+      if Array === snapshot
+        snapshot.map { |each| from_snapshot each, options }
+      else
+        from_snapshot snapshot, options
       end
+    end
 
-      def to_s
-        @type.to_s
-      end
+    # TODO: consider implementing parse function that reads from file or
+    # string, also consider options to read array or object or both?
 
-      def from_snapshot(data, options)
-        if @type == Symbol
-          data.to_sym if data
-        elsif Class === @type && @type.respond_to?(:from_snapshot)
-          @type.from_snapshot(data, options)
-        else
-          data
+
+    # ------- validation -----------------------------------------------
+
+    def check_types
+      self.class.fields.each do |name, field|
+        if not field === self[name]
+          raise "expected #{name} to be #{field}, got #{self[name].inspect}"
         end
       end
     end
 
-    class EnumMatcher < Matcher
-      def ===(value)
-        @type.any? { |each| each === value }
+    # TODO: consider implementing an enumeration over the error messages,
+    # also consider nested field names, eg address.street
+
+
+    # ------- helper methods -------------------------------------------
+
+    def prune_default_values
+      self.class.fields.each do |name, field|
+        case value = self[name]
+        when field.default_value
+          self.delete(name)
+        when Model
+          value.prune_default_values
+        when Array
+          value.each { |each| each.prune_default_values if Model === each }
+        end
       end
 
-      def to_s
-        "enum(#{@type.map(&:inspect).join(', ')})"
-      end
-
-      def from_snapshot(data, options)
-        String === data ? data.to_sym : data
-      end
+      return self
     end
-
-    class ListMatcher < Matcher
-      def initialize_options(options)
-        @option_empty = options.fetch(:empty, true)
-      end
-
-      def ===(value)
-        return false unless Array === value
-        return false if value.empty? unless @option_empty
-        value.all? { |each| @type === each }
-      end
-
-      def default_value
-        []
-      end
-
-      def to_s
-        "list(#{@type}#{', empty: false' unless @option_empty})"
-      end
-
-      def from_snapshot(data, options)
-        data && data.map { |each| super(each, options) }
-      end
-    end
-
-    class NullableMatcher < Matcher
-      def ===(value)
-        @type === value || value.nil?
-      end
-
-      def to_s
-        "nullable(#{@type})"
-      end
-    end
-
-    class PositiveMatcher < Matcher
-      def ===(value)
-        @type === value && value.positive?
-      end
-
-      def to_s
-        "positive(#{@type})"
-      end
-    end
-
-    # FIXME: make this matcher class a module that can be included here
-
-    class PositiveOrZeroMatcher < Matcher
-      def ===(value)
-        @type === value && !value.negative?
-      end
-
-      def to_s
-        "positive_or_zero(#{@type})"
-      end
-    end
-
-    Boolean = enum(true, false)
-    Timestamp = Regexp.new(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d.\d\d\dZ$/)
   end
 end

@@ -14,6 +14,7 @@ __END__
 
 - Require 'hamachi/model' to import model as top-level constant
 - Require 'hamachi/ext' to extend arrays and other enumerables
+- New function Model.register_matcher
 
 0.1.0
 

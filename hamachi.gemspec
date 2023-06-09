@@ -25,6 +25,7 @@ Gem::Specification.new do |spec|
     lib/hamachi/model.rb
     lib/hamachi/ext.rb
     lib/hamachi/enumerable_ext.rb
+    lib/hamachi/matcher.rb
     lib/hamachi/version.rb
   }
 
