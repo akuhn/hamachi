@@ -100,7 +100,7 @@ describe Hamachi::Model do
         { name: 'Anna', gender: :female, age: 29 },
         freeze: true,
       )
-      expect { anna.name = 'Sophie' }.to raise_error(/can't modify frozen model/)
+      expect { anna.name = 'Sophie' }.to raise_error(/can't modify frozen schema/)
     end
   end
 
@@ -268,7 +268,7 @@ describe Hamachi::Model do
 
     it 'anonymous model prints human-readable representation' do
       type = model.fields[:address]
-      expect(type.to_s).to eq 'model(street:String,city:String)'
+      expect(type.to_s).to eq 'schema(street:String,city:String)'
     end
 
     it 'constructor should accept nested hashes' do
