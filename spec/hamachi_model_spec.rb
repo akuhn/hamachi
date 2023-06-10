@@ -28,12 +28,15 @@ describe Hamachi::Model do
 
   describe '.field' do
 
-    it 'generates read and write accessors' do
+    it 'generates read accessors' do
       expect(anna).to respond_to(:name)
-      expect(anna).to respond_to(:name=)
       expect(anna).to respond_to(:gender)
-      expect(anna).to respond_to(:gender=)
       expect(anna).to respond_to(:age)
+    end
+
+    it 'generates write accessors' do
+      expect(anna).to respond_to(:name=)
+      expect(anna).to respond_to(:gender=)
       expect(anna).to respond_to(:age=)
     end
 
@@ -56,7 +59,7 @@ describe Hamachi::Model do
     end
   end
 
-  describe 'read and write accessors' do
+  describe 'field accessors' do
 
     it 'allows getting the value of a field' do
       expect(anna.name).to eq 'Anna'
@@ -70,9 +73,7 @@ describe Hamachi::Model do
     end
 
     it 'raises error when setting an invalid field value' do
-      expect {
-        anna.gender = :other
-      }.to raise_error 'expected gender to be enum(:male,:female), got :other'
+      expect { anna.gender = :other }.to raise_error %r{expected gender .* got :other}
       expect(anna.gender).to eq :female
     end
   end
@@ -172,21 +173,69 @@ describe Hamachi::Model do
       anna[:age] = 9000
       expect(anna.error_messages).to match_array [%r{expected gender}, %r{expected age}]
     end
+  end
 
-    it 'creates model instance from JSON snapshot' do
+  describe '.parse' do
+
+    it 'reads model instance from a JSON object' do
       json = '{"name":"Anna","gender":"female","age":29}'
       expect(model.parse json).to eq anna
     end
 
-    it 'raises error when JSON snapshot was parsed without symbolize_names=true' do
-      json = '{"name":"Anna","gender":"female","age":29}'
-      snapshot = JSON.parse json # defaults to { symbolize_names: false } option
-      expect { model.from_snapshot snapshot }.to raise_error 'expected name to be String, got nil'
+    it 'reads array of model instances from JSON array' do
+      people = model.parse %{[
+        {"name":"Anna","gender":"female","age":29},
+        {"name":"Sophie","gender":"female","age":32},
+        {"name":"Bob","gender":"male","age":45}
+      ]}
+      expect(people).to be_kind_of Array
+      expect(people.first).to be_kind_of model
+      expect(people.map(&:name)).to eq %w{Anna Sophie Bob}
     end
 
-    it 'raises error when JSON snapshot includes invalid field' do
+    it 'accepts JSON string as value for symbol field' do
+      model = Hamachi::Model.schema do
+        field :example, type: Symbol
+      end
+
+      m = model.parse('{"example":"foo"}')
+      expect(m.example).to eq :foo
+    end
+
+    it 'accepts JSON string as value for enum field' do
+      model = Hamachi::Model.schema do
+        field :example, type: enum(:foo, :bar)
+      end
+
+      m = model.parse('{"example":"foo"}')
+      expect(m.example).to eq :foo
+    end
+
+    it 'raises an error when snapshot includes invalid field' do
       json = '{"name":"Anna","gender":"female","age":9000}'
-      expect { model.parse json }.to raise_error(/expected age to be .../)
+      expect { model.parse json }.to raise_error %r{expected age .* got 9000}
+    end
+
+    it 'raises an error when snapshot includes missing field' do
+      json = '{"name":"Anna","age":9000}'
+      expect { model.parse json }.to raise_error %r{expected gender .* got nil}
+    end
+  end
+
+  describe '.from_snapshot' do
+
+    it 'raises error when JSON was parsed without symbolize_names=true' do
+      expect {
+        snapshot = JSON.parse '{"name":"Anna","gender":"female","age":29}'
+        model.from_snapshot snapshot
+      }.to raise_error 'expected name to be String, got nil'
+    end
+  end
+
+  describe 'JSON.dump' do
+
+    it 'generates snapshot of the model' do
+      expect(JSON.dump anna).to eq '{"name":"Anna","gender":"female","age":29}'
     end
   end
 
@@ -405,35 +454,6 @@ describe Hamachi::Model do
       expect {
         model.new(nickname: 23)
       }.to raise_error 'expected nickname to be nullable(String), got 23'
-    end
-  end
-
-  describe '.parse' do
-
-    it 'accepts string for symbol field' do
-      model = Hamachi::Model.schema {
-        field :function, type: Symbol
-      }
-      m = model.parse('{"function":"fib"}')
-      expect(m.function).to eq :fib
-    end
-
-    it 'accepts string for symbol enum' do
-      model = Hamachi::Model.schema {
-        field :gender, type: (enum :female, :male)
-      }
-      m = model.parse('{"gender":"female"}')
-      expect(m.gender).to eq :female
-    end
-
-    it 'reads array of model instances' do
-      model = Hamachi::Model.schema {
-        field :rank, type: Integer
-      }
-      array = model.parse('[{"rank":4},{"rank":7},{"rank":3}]')
-      expect(array).to be_kind_of Array
-      expect(array.first).to be_kind_of model
-      expect(array.first.rank).to eq 4
     end
   end
 end
