@@ -15,6 +15,7 @@ __END__
 
 - Rename Matcher class to Field class
 - Rename Model.register_matcher to Model.register_type
+- Rename check_types to valid? and validate_fields!
 - Add some more tests
 
 0.2.0

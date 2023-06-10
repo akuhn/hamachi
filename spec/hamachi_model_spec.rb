@@ -88,7 +88,7 @@ describe Hamachi::Model do
       expect {
         model.new(
           { name: 'Anna', gender: :female, age: 9000 },
-          check_types: false,
+          validate_fields: false,
         )
       }.not_to raise_error
     end

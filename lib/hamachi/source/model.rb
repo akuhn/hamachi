@@ -71,7 +71,7 @@ module Hamachi
         self[name] = field.from_snapshot(value, options)
       end
 
-      check_types if options.fetch(:check_types, true)
+      validate_fields! if options.fetch(:validate_fields, true)
       freeze if options.fetch(:freeze, false)
     end
 
@@ -92,13 +92,21 @@ module Hamachi
 
     # ------- validation -----------------------------------------------
 
-    # TODO: consider implementing an enumeration over the error messages,
-    # also consider nested field names, eg address.street
+    def valid?
+      gen_error_messages { return false }
+      return true
+    end
 
-    def check_types
+    def validate_fields!
+      gen_error_messages { |error| raise error }
+    end
+
+    private
+
+    def gen_error_messages
       self.class.fields.each do |name, field|
         if not field === self[name]
-          raise "expected #{name} to be #{field}, got #{self[name].inspect}"
+          yield "expected #{name} to be #{field}, got #{self[name].inspect}"
         end
       end
     end
