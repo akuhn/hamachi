@@ -4,11 +4,19 @@ require 'json'
 describe Hamachi::Model do
 
   let(:model) {
-    Class.new Hamachi::Model do
+    Hamachi::Model.schema do
       field %{name}, type: String
       field %{gender}, type: enum(:male, :female)
       field %{age}, type: 1..100
     end
+  }
+
+  let(:anna) {
+    model.new(
+      name: 'Anna',
+      gender: :female,
+      age: 29,
+    )
   }
 
   describe '.fields' do
@@ -18,17 +26,9 @@ describe Hamachi::Model do
     end
   end
 
-  describe 'with simple model' do
+  describe '.field' do
 
-    let(:anna) {
-      model.new(
-        name: 'Anna',
-        gender: :female,
-        age: 29,
-      )
-    }
-
-    it 'has attribute acessors' do
+    it 'generates read and write accessors' do
       expect(anna).to respond_to(:name)
       expect(anna).to respond_to(:name=)
       expect(anna).to respond_to(:gender)
@@ -37,27 +37,131 @@ describe Hamachi::Model do
       expect(anna).to respond_to(:age=)
     end
 
-    it 'should read fields' do
+    it 'raises an error when reader method already defined' do
+      expect {
+        Hamachi::Model.schema do
+          attr_reader :foo
+          field :foo, type: Object
+        end
+      }.to raise_error 'method #foo already defined'
+    end
+
+    it 'raises an error when writer method already defined' do
+      expect {
+        Hamachi::Model.schema do
+          attr_writer :foo
+          field :foo, type: Object
+        end
+      }.to raise_error 'method #foo= already defined'
+    end
+  end
+
+  describe 'read and write accessors' do
+
+    it 'allows getting the value of a field' do
       expect(anna.name).to eq 'Anna'
       expect(anna.gender).to eq :female
       expect(anna.age).to eq 29
     end
 
-    it 'should write fields' do
+    it 'allows setting the value of a field' do
       anna.name = 'Sophie'
       expect(anna.name).to eq 'Sophie'
     end
 
     it 'raises error when setting an invalid field value' do
-      expect { anna.gender = :other }.to raise_error(/expected gender to be .../)
+      expect {
+        anna.gender = :other
+      }.to raise_error 'expected gender to be enum(:male,:female), got :other'
       expect(anna.gender).to eq :female
     end
+  end
 
-    it 'raises error when initializing to an invalid field value' do
+  describe '#initialize' do
+
+    it 'creates a new model instance from hash with field values' do
+      hash = { name: 'Anna', gender: :female, age: 29 }
+      m = model.new(hash)
+      expect(m).to eq hash
+    end
+
+    it 'raises error when hash includes an invalid field value' do
       expect {
         model.new(name: 'Anna', gender: :female, age: 9000)
-      }.to raise_error(/expected age to be .../)
+      }.to raise_error %r{expected age .* got 9000}
     end
+
+    it 'raises error when hash is missing a field' do
+      expect {
+        model.new(name: 'Anna', age: 29)
+      }.to raise_error %r{expected gender .* got nil}
+    end
+
+    it 'defaults to including unknown fields' do
+      hash = { name: 'Anna', gender: :female, age: 29, hobby: 'painting' }
+      anna = model.new(hash)
+      expect(anna[:hobby]).to eq 'painting'
+    end
+
+    it 'ignores unknown fields when option is disabled' do
+      hash = { name: 'Anna', gender: :female, age: 29, hobby: 'painting' }
+      anna = model.new(hash, include_unknown_fields: false)
+      expect(anna[:hobby]).to be_nil
+    end
+
+    it 'does not validate fields when option is disabled' do
+      hash = { name: 'Anna', gender: :female, age: 9000 }
+      expect {
+        model.new(hash, validate_fields: false)
+      }.not_to raise_error
+    end
+
+    it 'creates a new model instance that is immutable when option is enabled' do
+      hash = { name: 'Anna', gender: :female, age: 29 }
+      anna = model.new(hash, freeze: true)
+      expect { anna.name = 'Sophie' }.to raise_error %r{can't modify frozen}
+    end
+  end
+
+  describe '#valid?' do
+
+    it 'returns true when fields match their type' do
+      expect(anna.valid?).to be true
+    end
+
+    it 'returns false when fields are missing' do
+      anna.delete(:gender)
+      expect(anna.valid?).to be_falsy
+    end
+
+    it 'returns false when fields do not match their type' do
+      anna[:age] = 9000
+      expect(anna.valid?).to be_falsy
+    end
+  end
+
+  describe '#validate_fields!' do
+
+    it 'does not raise error when fields match their type' do
+      expect { anna.validate_fields! }.to_not raise_error
+    end
+
+    it 'raises error when fields are missing' do
+      expect {
+        anna.delete(:gender)
+        anna.validate_fields!
+      }.to raise_error 'expected gender to be enum(:male,:female), got nil'
+    end
+
+    it 'raises error when fields do not match their type' do
+      expect {
+        anna[:age] = 9000
+        anna.validate_fields!
+      }.to raise_error 'expected age to be 1..100, got 9000'
+    end
+  end
+
+  describe 'with simple model' do
 
     it 'generates JSON snapshot of the model' do
       expect(JSON.dump anna).to eq '{"name":"Anna","gender":"female","age":29}'
@@ -77,48 +181,6 @@ describe Hamachi::Model do
     it 'raises error when JSON snapshot includes invalid field' do
       json = '{"name":"Anna","gender":"female","age":9000}'
       expect { model.parse json }.to raise_error(/expected age to be .../)
-    end
-
-    it 'should include unknown fields by default' do
-      anna = model.new(name: 'Anna', gender: :female, age: 29, hobby: 'painting')
-      expect(anna[:hobby]).to eq 'painting'
-    end
-
-    it 'should not check types when the option is disabled' do
-      expect {
-        model.new(
-          { name: 'Anna', gender: :female, age: 9000 },
-          validate_fields: false,
-        )
-      }.not_to raise_error
-    end
-
-    it 'should ignore unknown fields when the option is disabled' do
-      anna = model.new(
-        { name: 'Anna', gender: :female, age: 29, hobby: 'painting' },
-        include_unknown_fields: false,
-      )
-      expect(anna[:hobby]).to be_nil
-    end
-
-    it 'should freeze the model when the option is enabled' do
-      anna = model.new(
-        { name: 'Anna', gender: :female, age: 29 },
-        freeze: true,
-      )
-      expect { anna.name = 'Sophie' }.to raise_error(/can't modify frozen/)
-    end
-
-    it 'raises error when reader method already defined' do
-      model = Class.new Hamachi::Model
-      model.send(:attr_reader, :name)
-      expect { model.field :name, type: String }.to raise_error 'method #name already defined'
-    end
-
-    it 'raises error when writer method already defined' do
-      model = Class.new Hamachi::Model
-      model.send(:attr_writer, :name)
-      expect { model.field :name, type: String }.to raise_error 'method #name= already defined'
     end
   end
 

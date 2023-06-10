@@ -44,7 +44,7 @@ module Hamachi
     end
 
     def to_s
-      "enum(#{@type.map(&:inspect).join(', ')})"
+      "enum(#{@type.map(&:inspect).join(?,)})"
     end
 
     def from_snapshot(data, options)

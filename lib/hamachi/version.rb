@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Hamachi
-  VERSION = "0.3.0-beta"
+  VERSION = "0.3.1"
 end
 
 __END__
@@ -11,12 +11,15 @@ __END__
 # Patch version bump when backward-compatible bug fixes, security updates etc
 
 
+0.3.1
+
+- Rename check_types to valid? and validate_fields!
+- Reorganize tests and write more tests
+
 0.3.0
 
 - Rename Matcher class to Field class
 - Rename Model.register_matcher to Model.register_type
-- Rename check_types to valid? and validate_fields!
-- Add some more tests
 
 0.2.0
 
