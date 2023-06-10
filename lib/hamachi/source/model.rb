@@ -101,6 +101,10 @@ module Hamachi
       gen_error_messages { |error| raise error }
     end
 
+    def error_messages
+      enum_for(:gen_error_messages).entries
+    end
+
     private
 
     def gen_error_messages

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Hamachi
-  VERSION = "0.3.1"
+  VERSION = "0.3.2-beta"
 end
 
 __END__
@@ -10,6 +10,12 @@ __END__
 # Minor version bump when backward-compatible changes or enhancements
 # Patch version bump when backward-compatible bug fixes, security updates etc
 
+
+0.3.2
+
+- New function Model#error_messages
+- Reorganize tests and write more tests
+- ...
 
 0.3.1
 

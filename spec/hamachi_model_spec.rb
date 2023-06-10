@@ -161,10 +161,16 @@ describe Hamachi::Model do
     end
   end
 
-  describe 'with simple model' do
+  describe '#error_messages' do
 
-    it 'generates JSON snapshot of the model' do
-      expect(JSON.dump anna).to eq '{"name":"Anna","gender":"female","age":29}'
+    it 'is empty when fields match their type' do
+      expect(anna.error_messages).to be_empty
+    end
+
+    it 'includes all validation errors when fields are invalid' do
+      anna.delete(:gender)
+      anna[:age] = 9000
+      expect(anna.error_messages).to match_array [%r{expected gender}, %r{expected age}]
     end
 
     it 'creates model instance from JSON snapshot' do
