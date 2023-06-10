@@ -21,12 +21,13 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
   spec.files = %w{
     README.md
-    lib/hamachi.rb
-    lib/hamachi/model.rb
     lib/hamachi/ext.rb
-    lib/hamachi/enumerable_ext.rb
-    lib/hamachi/matcher.rb
+    lib/hamachi/model.rb
+    lib/hamachi/source/enumerable_ext.rb
+    lib/hamachi/source/field.rb
+    lib/hamachi/source/model.rb
     lib/hamachi/version.rb
+    lib/hamachi.rb
   }
 
   # For more information and examples about making a new gem, check out our

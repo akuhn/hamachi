@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Extension for arrays and other enumerables. It provides convenient and
 # reusable functionality to manipulate and analyze enumerable objects in
 # a concise and expressive manner.

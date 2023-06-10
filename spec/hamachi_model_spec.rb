@@ -1,18 +1,24 @@
-require 'hamachi/model'
 require 'json'
 
 
 describe Hamachi::Model do
 
-  describe 'with simple model' do
+  let(:model) {
+    Class.new Hamachi::Model do
+      field %{name}, type: String
+      field %{gender}, type: enum(:male, :female)
+      field %{age}, type: 1..100
+    end
+  }
 
-    let(:model) {
-      Class.new(Hamachi::Model) do
-        field %{name}, type: String
-        field %{gender}, type: enum(:male, :female)
-        field %{age}, type: 1..100
-      end
-    }
+  describe '.fields' do
+
+    it 'returns all the fields defined in the model' do
+      expect(model.fields.keys).to eq [:name, :gender, :age]
+    end
+  end
+
+  describe 'with simple model' do
 
     let(:anna) {
       model.new(
@@ -53,15 +59,6 @@ describe Hamachi::Model do
       }.to raise_error(/expected age to be .../)
     end
 
-    it 'should not check types when the option is disabled' do
-      expect {
-        model.new(
-        { name: 'Anna', gender: :female, age: 9000 },
-          check_types: false,
-        )
-      }.not_to raise_error
-    end
-
     it 'generates JSON snapshot of the model' do
       expect(JSON.dump anna).to eq '{"name":"Anna","gender":"female","age":29}'
     end
@@ -82,12 +79,21 @@ describe Hamachi::Model do
       expect { model.parse json }.to raise_error(/expected age to be .../)
     end
 
-    it 'should allow undeclared fields by default' do
+    it 'should include unknown fields by default' do
       anna = model.new(name: 'Anna', gender: :female, age: 29, hobby: 'painting')
       expect(anna[:hobby]).to eq 'painting'
     end
 
-    it 'should not allow undeclared fields when the option is disabled' do
+    it 'should not check types when the option is disabled' do
+      expect {
+        model.new(
+          { name: 'Anna', gender: :female, age: 9000 },
+          check_types: false,
+        )
+      }.not_to raise_error
+    end
+
+    it 'should ignore unknown fields when the option is disabled' do
       anna = model.new(
         { name: 'Anna', gender: :female, age: 29, hobby: 'painting' },
         include_unknown_fields: false,
@@ -102,6 +108,18 @@ describe Hamachi::Model do
       )
       expect { anna.name = 'Sophie' }.to raise_error(/can't modify frozen/)
     end
+
+    it 'raises error when reader method already defined' do
+      model = Class.new Hamachi::Model
+      model.attr_reader :name
+      expect { model.field :name, type: String }.to raise_error 'method #name already defined'
+    end
+
+    it 'raises error when writer method already defined' do
+      model = Class.new Hamachi::Model
+      model.attr_writer :name
+      expect { model.field :name, type: String }.to raise_error 'method #name= already defined'
+    end
   end
 
   describe 'when field is a list' do
@@ -111,6 +129,11 @@ describe Hamachi::Model do
         field %{sequence}, type: (list Integer)
       end
     }
+
+    it 'initializes list of values' do
+      m = model.new(sequence: [4,7,3])
+      expect(m.sequence).to eq [4,7,3]
+    end
 
     it 'should initialize to default value' do
       m = model.new({})
@@ -130,9 +153,11 @@ describe Hamachi::Model do
     end
 
     it 'should raise error when empty list is passed to non-empty field' do
+      model = Hamachi::Model.schema do
+        field %{sequence}, type: (list Integer), empty: false
+      end
       expect {
-        model = Hamachi::Model.schema { field %{sequence}, type: (list Integer), empty: false }
-        model.new({sequence: []})
+        model.new(sequence: [])
       }.to raise_error(/expected .* to be .* empty: false/)
     end
   end
@@ -140,7 +165,7 @@ describe Hamachi::Model do
   describe 'with custom type matcher' do
 
     let(:matcher) {
-      Class.new Hamachi::Matcher do
+      Class.new Hamachi::Field do
         def ===(value)
           @type === value && value.odd?
         end
@@ -156,9 +181,14 @@ describe Hamachi::Model do
     }
 
     let(:model) {
-      odd_number = matcher.new(Numeric)
+      odd_number = matcher.new(Integer)
       Hamachi::Model.schema { field %{num}, type: odd_number }
     }
+
+    it 'initializes value' do
+      m = model.new(num: 17)
+      expect(m.num).to eq 17
+    end
 
     it 'should use default value when field missing upon initialize' do
       m = model.new({})
@@ -262,8 +292,8 @@ describe Hamachi::Model do
 
     it 'should serialize-and-back using JSON format' do
       m = model.parse annas_order
-      json = (JSON.dump m)
-      expect(model.parse json).to eq m
+      json_string = (JSON.dump m)
+      expect(model.parse json_string).to eq m
     end
 
     it 'anonymous model prints human-readable representation' do
@@ -277,6 +307,65 @@ describe Hamachi::Model do
       expect(m.address).to be_a Hamachi::Model
       expect(m.address.street).to eq '834 Oak Street'
       expect(m.address.city).to eq 'Roseville'
+    end
+  end
+
+  describe 'with nullable field' do
+
+    let(:model) {
+      Hamachi::Model.schema do
+        field :nickname, type: (nullable String)
+      end
+    }
+
+    it 'accepts string value' do
+      m = model.new(nickname: 'Nina')
+      expect(m.nickname).to eq 'Nina'
+    end
+
+    it 'accepts nil value' do
+      m = model.new(nickname: nil)
+      expect(m.nickname).to be_nil
+    end
+
+    it 'accepts missing value' do
+      m = model.new({})
+      expect(m.nickname).to be_nil
+    end
+
+    it 'should raise error for non-string value' do
+      expect {
+        model.new(nickname: 23)
+      }.to raise_error 'expected nickname to be nullable(String), got 23'
+    end
+  end
+
+  describe '.parse' do
+
+    it 'accepts string for symbol field' do
+      model = Hamachi::Model.schema {
+        field :function, type: Symbol
+      }
+      m = model.parse('{"function":"fib"}')
+      expect(m.function).to eq :fib
+    end
+
+    it 'accepts string for symbol enum' do
+      model = Hamachi::Model.schema {
+        field :gender, type: (enum :female, :male)
+      }
+      m = model.parse('{"gender":"female"}')
+      expect(m.gender).to eq :female
+    end
+
+    it 'reads array of model instances' do
+      model = Hamachi::Model.schema {
+        field :rank, type: Integer
+      }
+      array = model.parse('[{"rank":4},{"rank":7},{"rank":3}]')
+      expect(array).to be_kind_of Array
+      expect(array.first).to be_kind_of model
+      expect(array.first.rank).to eq 4
     end
   end
 end

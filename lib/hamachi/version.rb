@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Hamachi
-  VERSION = "0.2.0-beta"
+  VERSION = "0.3.0-beta"
 end
 
 __END__
@@ -9,6 +9,13 @@ __END__
 # Major version bump when breaking changes or new features
 # Minor version bump when backward-compatible changes or enhancements
 # Patch version bump when backward-compatible bug fixes, security updates etc
+
+
+0.3.0
+
+- Rename Matcher class to Field class
+- Rename Model.register_matcher to Model.register_type
+- Add some more tests
 
 0.2.0
 

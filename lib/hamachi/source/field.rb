@@ -1,8 +1,9 @@
+# frozen_string_literal: true
 
 
 module Hamachi
 
-  class Matcher
+  class Field
     def initialize(type)
       @type = type
     end
@@ -22,7 +23,7 @@ module Hamachi
       @type.to_s
     end
 
-    def from_snapshot(data, options)
+    def from_snapshot(data, options = nil)
       if @type == Symbol
         data.to_sym if data
       elsif Class === @type && @type.respond_to?(:from_snapshot)
@@ -33,7 +34,7 @@ module Hamachi
     end
   end
 
-  class EnumMatcher < Matcher
+  class EnumField < Field
     def initialize(*symbols)
       super symbols
     end
@@ -51,7 +52,7 @@ module Hamachi
     end
   end
 
-  class ListMatcher < Matcher
+  class ListField < Field
     def initialize_options(options)
       @option_empty = options.fetch(:empty, true)
     end
@@ -75,7 +76,7 @@ module Hamachi
     end
   end
 
-  class NullableMatcher < Matcher
+  class NullableField < Field
     def ===(value)
       @type === value || value.nil?
     end
