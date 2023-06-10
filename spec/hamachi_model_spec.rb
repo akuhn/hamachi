@@ -111,13 +111,13 @@ describe Hamachi::Model do
 
     it 'raises error when reader method already defined' do
       model = Class.new Hamachi::Model
-      model.attr_reader :name
+      model.send(:attr_reader, :name)
       expect { model.field :name, type: String }.to raise_error 'method #name already defined'
     end
 
     it 'raises error when writer method already defined' do
       model = Class.new Hamachi::Model
-      model.attr_writer :name
+      model.send(:attr_writer, :name)
       expect { model.field :name, type: String }.to raise_error 'method #name= already defined'
     end
   end
